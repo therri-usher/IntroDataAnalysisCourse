@@ -1,1 +1,0 @@
-This folder contains sample programs that can be used to complete the active learning activities given in the class.
