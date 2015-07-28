@@ -44,11 +44,12 @@ education[new.dat$DMDEDUC2 == 3] <- 2
 education[new.dat$DMDEDUC2 == 4] <- 3
 education[new.dat$DMDEDUC2 == 5] <- 4
 
-# Assess if there are any age outliers in the model.
-which(new.dat$RIDAGEMN < lower.limit | new.dat$RIDAGEMN > upper.limit)
-
 # Make sure that if a subject is less than 18 years of age that they are
 # not in any inappropriate relationships.
+which(new.dat$RIDAGEMN < lower.limit | new.dat$RIDAGEMN > upper.limit)
+
+# Assess if there are any age outliers in the model. If so, add the index
+# for that observation into the defined vector.
 which(new.dat$RIDAGEMN < 216 & new.dat$DMDMARTL != 5)
 
 # BONUS: Define a new factor variable based on the new education variable

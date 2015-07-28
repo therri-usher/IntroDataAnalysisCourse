@@ -1,0 +1,652 @@
+#########################
+#                       #
+# STAT 599 Spring 2013  #
+#                       #
+# Example R code        #
+#                       #
+# Chapter 2 (and 6)     #
+#                       #
+#########################
+
+### Installing the add-on packages needed for this course:
+
+# If you haven't already done so, 
+# type at the command line (without the preceding # ):
+
+# install.packages(c('faraway','mgcv','acepack','mda','brlr','sm','wavethresh','SuppDists','lme4'))
+
+# and choose a U.S. mirror site when the window pops up.
+# This will install the needed packages for you.
+
+# load the 'faraway' package:
+
+library(faraway)
+
+# loading the 'orings' dataset:
+
+data(orings)
+
+# attaching the 'orings' dataset:
+
+attach(orings)
+
+# Now the columns of the data frame can be referred to by name.
+
+
+# To see the data, type the name of the data object:
+
+orings
+
+# For each observation, the measurement is the count of damaged rings (out of 6 possible).
+# We can plot the proportions by diving the damage counts by 6:
+
+plot(damage/6 ~ temp, data = orings, xlim=c(25,85), ylim=c(0,1), xlab="Temperature", ylab="Prob of damage")
+
+# A naive simple linear model is fit and overlain on the plot by:
+
+lmod <- lm(damage/6 ~ temp, data=orings)
+abline(lmod)
+
+# The result matches Figure 2.1 in the book.
+
+#### The Binomial GLM fit with the o-rings data:
+
+# The 'damage' vector contains counts of damaged o-rings.
+# Subtracting 'damage' from 6 will give the counts of non-damaged o-rings for each mission:
+
+nondamage <-  6 - damage
+
+
+# Fitting the logistic regression model and summarizing the fitted model:
+
+my.logit.mod <- glm(cbind(damage, nondamage) ~ temp, family=binomial, data=orings)
+
+# Note that the logit link is the default link for a binomial response.
+
+summary(my.logit.mod)
+
+# Plotting the fitted probability curve along with the observed sample proportions:
+
+plot(damage/6 ~ temp, data = orings, xlim=c(25,85), ylim=c(0,1), xlab="Temperature", ylab="Prob of damage")
+# creating a grid of x-values from 25 to 85:
+x <- seq(25, 85, 0.1)
+lines(x, ilogit(coef(my.logit.mod)[1] + coef(my.logit.mod)[2]*x) )
+
+# Suppose we preferred the probit link:
+
+my.probit.mod <- glm(cbind(damage, nondamage) ~ temp, family=binomial(link=probit), data=orings)
+summary(my.probit.mod)
+lines(x, pnorm(coef(my.probit.mod)[1] + coef(my.probit.mod)[2]*x), lty=2 )
+
+
+### Predicting the probability of damage when temp = 31:
+
+# logit fitted model:
+ilogit(coef(my.logit.mod)[1] + coef(my.logit.mod)[2]*31)
+
+# probit fitted model:
+pnorm(coef(my.probit.mod)[1] + coef(my.probit.mod)[2]*31)
+
+
+#### Inference about the logistic regression, with the o-rings data:
+
+# Testing the goodness of fit of the chosen model, relative to a saturated model:
+
+pchisq(deviance(my.logit.mod), df.residual(my.logit.mod), lower=F)
+
+# A model without temperature (just with an intercept term):
+smaller.model <- glm(cbind(damage, nondamage) ~ 1, family=binomial, data=orings)
+
+deviance(smaller.model)
+
+# Note this is the same as the 'Null deviance' reported in the original output.
+
+# Testing whether temperature is needed in the model:
+
+pchisq(deviance(smaller.model)-deviance(my.logit.mod), df.residual(smaller.model)-df.residual(my.logit.mod), lower=F)
+
+# Profile-likelihood confidence intervals for the regression parameters (the betas):
+
+library(MASS)  # this is necessary
+confint(my.logit.mod)
+
+#### Goodness of Fit for binary-response models: 
+
+# A simple example:
+
+y <- c(0,0,1,0,0,1,1,0,0,1,1,1,1,0,1,0,1,1,1)
+x <- c(1.2,1.5,1.8,1.9,2.0,2.3,2.5,2.6,2.8,3.1,3.2,3.3,3.6,3.7,3.9,4.0,4.2,4.3,4.6)
+
+simple.logistic <- glm(y ~ x, family=binomial)
+
+
+####
+# A function to do the Hosmer-Lemeshow test in R.
+# R Function is due to Peter D. M. Macdonald, McMaster University.
+# 
+hosmerlem <-
+function (y, yhat, g = 10) 
+{
+    cutyhat <- cut(yhat, breaks = quantile(yhat, probs = seq(0, 
+        1, 1/g)), include.lowest = T)
+    obs <- xtabs(cbind(1 - y, y) ~ cutyhat)
+    expect <- xtabs(cbind(1 - yhat, yhat) ~ cutyhat)
+    chisq <- sum((obs - expect)^2/expect)
+    P <- 1 - pchisq(chisq, g - 2)
+    c("X^2" = chisq, Df = g - 2, "P(>Chi)" = P)
+}
+#
+######
+
+# Doing the Hosmer-Lemeshow test
+# (after copying the above function into R):
+
+hosmerlem(y, fitted(simple.logistic))
+
+# Large P-value indicates a reasonable fit.
+
+
+######################
+######################
+
+
+# load the 'faraway' package:
+
+library(faraway)
+
+# loading the 'babyfood' dataset:
+
+data(babyfood)
+
+# attaching the 'babyfood' dataset:
+
+attach(babyfood)
+
+# Now the columns of the data frame can be referred to by name.
+
+
+# To see the data, type the name of the data object:
+
+babyfood
+
+# Fitting models with and without interaction:
+
+logit.model.inter <- glm(cbind(disease, nondisease) ~ sex + food + sex:food, family=binomial, data=babyfood)
+logit.model <- glm(cbind(disease, nondisease) ~ sex + food, family=binomial, data=babyfood)
+
+# Testing whether the interaction is needed in the model:
+
+pchisq(deviance(logit.model)-deviance(logit.model.inter), df.residual(logit.model)-df.residual(logit.model.inter), lower=F)
+
+# Summary of the no-interaction model:
+
+summary(logit.model)
+
+# Testing the significance of each predictor individually:
+
+drop1(logit.model, test="Chi")
+
+# CIs for odds ratios:
+
+library(MASS)
+exp(confint(logit.model))
+
+#################################
+# 2.7 Choice of Link Functions
+#################################
+
+library(faraway)
+
+# loading the Bliss insect data
+
+data(bliss)
+
+# Attaching the data frame:
+
+attach(bliss)
+
+# Examining the data:
+
+print(bliss)
+
+# Fitting the model with the logit link (the default):
+
+model.logit <- glm(cbind(dead,alive) ~ conc, family=binomial, data=bliss)
+
+# Fitting the model with the probit link:
+
+model.probit <- glm(cbind(dead,alive) ~ conc, family=binomial(link=probit), data=bliss)
+
+# Fitting the model with the complementary log-log link:
+
+model.cloglog <- glm(cbind(dead,alive) ~ conc, family=binomial(link=cloglog), data=bliss)
+
+# In three columns, we list the fitted values for the three fits:
+
+cbind(fitted(model.logit), fitted(model.probit), fitted(model.cloglog))
+
+# Over the observed data range of concentration values (from 0 to 4)
+# the fitted values are not too different.
+
+# Let's try plotting the fitted curves over 
+# the concentration range from -2 to 8:
+
+x <- seq(-2,8, by=0.2)
+
+prob.logit <- ilogit(model.logit$coef[1] + model.logit$coef[2]*x)
+prob.probit <- pnorm(model.probit$coef[1] + model.probit$coef[2]*x)
+prob.cloglog <-  1-exp(-exp((model.cloglog$coef[1] + model.cloglog$coef[2]*x)))
+
+plot(x, prob.logit, type='l', ylab='Probability', xlab='Dose') # solid curve = logit
+lines(x, prob.probit, lty=2) # dashed = probit
+lines(x, prob.cloglog, lty=5) # longdash = c-log-log
+
+# Ratio of tail probabilities:  probit compared to logit:
+
+matplot(x, cbind(prob.probit/prob.logit, (1-prob.probit)/(1-prob.logit)), type='l', xlab='Dose', ylab='Ratio')
+
+# Ratio of tail probabilities:  c-log-log compared to logit:
+
+matplot(x, cbind(prob.cloglog/prob.logit, (1-prob.cloglog)/(1-prob.logit)), type='l', xlab='Dose', ylab='Ratio')
+
+# Outside of [0, 4] there is a substantial discrepancy in the fitted probabilities.
+
+#########################
+# 2.8 Estimation Problems
+#########################
+
+score <- c(30,40,50,70,80,90)
+succ <- c(0,0,0,1,1,1)
+
+my.model <- glm(succ ~ score, family=binomial)
+summary(my.model)
+
+# Notice the warning message and
+# look at the crazy standard errors for the estimates!
+
+## Hormone example (pg. 38-39):
+
+library(faraway)
+
+# loading the hormone data
+
+data(hormone)
+
+# Attaching the data frame:
+
+attach(hormone)
+
+# Plotting the data in the space of the two predictor variables,
+# with separate symbols for the two levels of the response, orientation
+# g = gay, s = straight:
+
+plot (estrogen ~ androgen, data=hormone, pch=as.character(orientation))
+
+# Attempting to fit a binomial model:
+
+model.horm <- glm(orientation ~ estrogen + androgen, data=hormone, family=binomial)
+summary(model.horm)
+
+# Again we see the warning message and
+# the huge standard errors for the estimates.
+
+# Bias-reduction logistic regression:
+
+library(brlr)
+
+model.horm.b <- brlr(orientation ~ estrogen + androgen, data=hormone, family=binomial)
+summary(model.horm.b)
+
+# The estimates and standard errors appear more sensible.
+
+# Note that the line corresponding to p = 0.5 (where 'g' and 's' are equally likely)
+# is almost the same for each model:
+
+plot (estrogen ~ androgen, data=hormone, pch=as.character(orientation))
+abline(-84.5/90.2, 100.9/90.2)  # based on original fit
+abline(-3.65/3.586, 4.074/3.586, lty=2) # dotted, based on brlr fit
+
+
+#########################
+# 6.4 GLM Diagnostics
+#########################
+
+
+library(faraway)
+
+# loading the Bliss insect data
+
+data(bliss)
+
+# Attaching the data frame:
+
+attach(bliss)
+
+# Fitting the model with the logit link with the Bliss insect data:
+
+model.logit.bliss <- glm(cbind(dead,alive) ~ conc, family=binomial, data=bliss)
+
+#### Various type of residuals and outlier diagnostics:
+
+# The deviance residuals (the default):
+
+residuals(model.logit.bliss)
+
+# The Pearson residuals:
+
+residuals(model.logit.bliss, "pearson")
+
+# The raw response residuals (not so useful with GLMs):
+
+residuals(model.logit.bliss, "response")
+
+# Jacknife residuals:
+
+rstudent(model.logit.bliss)
+
+# The hat diagonals, which measure leverage:
+
+influence(model.logit.bliss)$hat
+
+##### Diagnostics for influential observations:
+
+# The Cook distance statistics:
+
+cooks.distance(model.logit.bliss)
+
+# Assessing the change in coefficients resulting from casewise deletion:
+
+summary(model.logit.bliss)  # with the full data set
+
+influence(model.logit.bliss)$coef
+
+#### Goodness of fit measures:
+
+# Pearson's Chi-square statistic:
+
+sum(residuals(model.logit.bliss, "pearson")^2)
+
+# The deviance:
+
+deviance(model.logit.bliss)
+
+# P-value from the chi-square test for goodness of fit:
+
+1 - pchisq(deviance(model.logit.bliss), df.residual(model.logit.bliss) )
+
+# The large P-value indicates that the fit is reasonable.
+
+# Is the concentration predictor needed?  Deviance test:
+
+anova(model.logit.bliss, test="Chi")
+
+# Tiny p-value indicates the concentration variable is needed in the model.
+
+# Suppose we added a quadratic term.
+# Would that quadratic term be useful?
+
+model.bliss.quad <- model.logit <- glm(cbind(dead,alive) ~ conc + I(conc^2), family=binomial, data=bliss)
+
+anova(model.logit.bliss, model.bliss.quad, test="Chi")
+
+# The more complex model is not necessary. 
+# The quadratic term is not useful, given that 
+# the first-order term is present in the model.
+
+###### Graphical methods for model diagnostics:
+
+# Consider the binomial regression of admission vs. department and gender:
+# Data from Agresti (2002, Table 6.7)
+
+yes<-c(32,21,6,3,12,34,3,4,52,5,8,6,35,30,9,11,6,15,17,4,9,21,26,25,21,7,25,31,3,9,
+10,25, 25,39,2,4,3,0,29,6,16,7,23,36,4,10)
+no<-c(81,41,0,8,43,110,1,0,149,10,7,12,100,112,1,11,3,6,0,1,9,19,7,16,10,8,18,37,0,
+6,11,53,34,49,123,41,3,2,13,3,33,17,9,14,62,54)
+table.6.7<-cbind(expand.grid(gender=c("female","male"),
+dept=c("anth","astr","chem","clas","comm","comp","engl","geog","geol","germ",
+"hist","lati","ling","math","phil","phys","poli","psyc","reli","roma","soci",
+"stat","zool")),yes,no)
+
+attach(table.6.7)
+print(table.6.7)
+
+
+# binomial regression with department and gender as predictors:
+
+model.admit2 <- glm(cbind(yes,no) ~ dept + gender, family=binomial)
+summary(model.admit2)
+
+# P-value from the chi-square test for goodness of fit:
+
+1 - pchisq(deviance(model.admit2), df.residual(model.admit2) )
+
+# Small P-value:  evidence of lack of fit.
+
+# Testing the significance of each predictor individually:
+
+drop1(model.admit2, test="Chi")
+
+### Plots to examine outliers and influential observations:
+
+# half-normal plot of the jacknife residuals:
+
+halfnorm(rstudent(model.admit2))
+
+# half-normal plot of the hat diagonals:
+
+halfnorm(influence(model.admit2)$hat)
+
+# half-normal plot of the Cook distances:
+
+halfnorm(cooks.distance(model.admit2))
+
+# Which observation appears to most influence the fit?
+
+plot(cooks.distance(model.admit2), ylab='Cook Distance', xlab='Observation number')
+
+# Model fit without the influential observation:
+
+model.admit2b <- glm(cbind(yes,no) ~ dept + gender, family=binomial, subset=-35)
+summary(model.admit2b)
+
+1 - pchisq(deviance(model.admit2b), df.residual(model.admit2b) )
+
+# The fit (as measured by the deviance) appears *slightly* better.
+
+#### Plots to check model assumptions:
+
+# plotting deviance residuals against the linear predictor values:
+
+plot(residuals(model.admit2) ~ predict(model.admit2, type='link'), xlab=expression(hat(eta)), ylab='Deviance residuals')
+
+# There is no pattern that indicates any problem with the variance function.
+
+# Checking plots of the linearized response:
+
+props <- yes/(yes+no)
+mu <- predict(model.admit2, type='response')
+z <- predict(model.admit2) + (props-mu)/mu
+
+# We won't bother plotting the linearized response 
+# against each of the predictors in this example
+# because the predictors are categorical here.
+
+## Partial residual plots could be obtained by
+#plot(residuals(model.admit2,type='partial')[,'dept'] ~ dept)
+#plot(residuals(model.admit2,type='partial')[,'gender'] ~ gender)
+## but they are not useful here because of the categorical predictors.
+
+plot(z ~ predict(model.admit2), xlab='Linear predictor', ylab='Linearized response')
+
+# No problem with the link function.
+
+
+##########################################
+# 2.10 Prediction in Binomial Regression
+##########################################
+
+### Example: Bliss insect data
+
+library(faraway)
+
+# loading the Bliss insect data
+
+data(bliss)
+
+# Attaching the data frame:
+
+attach(bliss)
+
+# Fitting the model with the logit link with the Bliss insect data:
+
+model.logit.bliss <- glm(cbind(dead,alive) ~ conc, family=binomial, data=bliss)
+
+# A prediction of the probability of success (insect death) when conc = 2.5:
+
+pred2.5 <- predict(model.logit.bliss, newdata=data.frame(conc=2.5), se=T)
+
+ilogit(pred2.5$fit)
+
+# A 95% CI for this probability:
+
+ilogit(c(pred2.5$fit - 1.96*pred2.5$se.fit, pred2.5$fit + 1.96*pred2.5$se.fit))
+
+### If there are several predictors, just put in the code above something like:
+### newdata=data.frame(conc=2.5,x2=4.6,x3=5.8)
+### or whatever is the desired set of predictor values...
+
+
+### Effective Dose calculation:
+
+# What is the concentration that yields a probability of 0.5 of an insect dying?
+
+library(MASS)
+dose.p(model.logit.bliss, p=0.5)
+
+# A 95% CI for the ED50:
+
+c(2 - 1.96*0.1784367, 2 + 1.96*0.1784367)
+
+# What is the concentration that yields a probability of 0.8 of an insect dying?
+
+dose.p(model.logit.bliss, p=0.8)
+
+
+##########################################
+# 2.11 Overdispersion
+##########################################
+
+
+### Example: trout egg data
+
+library(faraway)
+
+# loading the trout egg data
+
+data(troutegg)
+
+# Attaching the data frame:
+
+attach(troutegg)
+
+# Data table is shown on pages 45-46 of the book.
+
+# Fitting a regular binomial GLM:
+died <- total - survive
+mod.trout <- glm(cbind(survive, died) ~ location + period, family=binomial, data=troutegg)
+summary(mod.trout)
+
+# Deviance shows a poor fit.
+
+# Checking for outliers:
+
+halfnorm(residuals(mod.trout))
+
+# Page 47 shows a model to check the structure of the model 
+# via interaction plots of the empirical logits:
+
+elogits <- log((survive+0.5)/(died+0.5))
+with(troutegg, interaction.plot(period, location, elogits))
+
+# The plots seem roughly parallel, so no sign of a structural problem.
+
+# Introduce an overdispersion parameter.
+# Estimate it by:
+
+sigma2hat <- sum(residuals(mod.trout,type='pearson')^2)/12
+print(sigma2hat)
+
+# The estimated dispersion is quite a bit bigger than 1.
+
+# Note 12 = the number of residual degrees of freedom in the model above.
+
+summary(mod.trout, dispersion=sigma2hat)
+
+# Note the estimated coefficients do not change, but the standard errors do.
+
+# Testing about the individual predictors 
+# in the model accounting for overdisperion:
+
+drop1(mod.trout, scale=sigma2hat, test="F")
+
+# Note the F-test is used rather than the Chi-square test.
+
+##########################################
+# 2.12 Matched case-control Studies
+##########################################
+
+### Example: x-ray data
+
+library(faraway)
+
+# loading the x-ray data
+
+data(amlxray)
+
+# Attaching the data frame:
+
+attach(amlxray)
+
+# Removing cases with Down syndrome and the corresponding controls
+# (see top of page 50)
+
+# This is the correct way to remove these data rows 
+# since set with ID=7018 contains 2 controls, not just one:
+
+ID.down <- ID[which(downs=='yes')]
+ramlxray <- amlxray[ID!=ID.down,]
+
+# This is the way the book removes them (not quite correctly).
+# and this will produce output matching the book's:
+
+downs.indices <- which(downs=='yes')
+ramlxray <- amlxray[-c(downs.indices, downs.indices+1),]
+
+# loading the 'survival' package:
+
+library(survival)
+
+# Fitting the conditional logit model for 
+# the matched case-control study:
+
+cmod <- clogit(disease ~ Sex + Mray + Fray + CnRay + strata(ID), data = ramlxray)
+summary(cmod)
+
+# Note the ID variable defines the matched sets
+# which is specified by the strata() function.
+
+# Clearly Sex and Mray are not needed 
+# and the quadratic and cubic effects associated with 
+# CnRay are not significant.  Let's drop them:
+
+cmodr <- clogit(disease ~ Fray + unclass(CnRay) + strata(ID), data=ramlxray)
+summary(cmodr)
+
+# We used the 'unclass' function to convert CnRay to its numerical coding 1-4.
+
+# The Fray variable is nonsignificant but CnRay is significant.
+
+# The exp(coef) column is important:
+# The estimated odds of disease increase by a factor of 2.23 as we 
+# move from one category of CnRay to the next higher category (holding Fray fixed).
+
